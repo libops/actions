@@ -1,0 +1,49 @@
+name: Workflow Template - backup environment
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+jobs:
+  backup:
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - id: auth
+      name: 'Authenticate to Google Cloud'
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
+        create_credentials_file: true
+        service_account: ${{ secrets.GSA }}
+        token_format: 'access_token'
+    - name: Extract Cloud Run URLs
+      shell: bash
+      run: |-
+        echo "environment=$(gcloud run services describe remote-${{ inputs.environment }} --region ${{ secrets.GCLOUD_REGION }} --format 'value(status.url)' --project ${{ secrets.GCLOUD_PROJECT }})" >> $GITHUB_OUTPUT
+      id: get_cloudrun_urls
+    - id: auth_environment
+      name: 'Authenticate to Google Cloud (source ID)'
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
+        create_credentials_file: true
+        service_account: ${{ secrets.GSA }}
+        token_format: 'id_token'
+        id_token_audience: ${{ steps.get_cloudrun_urls.outputs.environment }}
+    - name: Sync database
+      shell: bash
+      run: |-
+        ARCH="homebrew-cli_Linux_x86_64.tar.gz"
+        curl -s https://api.github.com/repos/LibOps/homebrew-cli/releases/latest > latest.json
+        URL=$(jq -rc '.assets[] | select(.name == "'$ARCH'") | .browser_download_url' latest.json)
+        wget $URL
+        tar -zxf $ARCH
+        ./libops backup \
+          --site ${{ secrets.GCLOUD_PROJECT }} \
+          --environment ${{ inputs.environment }} \
+          --token ${{ steps.auth_environment.outputs.id_token }}

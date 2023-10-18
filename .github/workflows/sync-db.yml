@@ -1,0 +1,66 @@
+name: Sync database
+on:
+  workflow_call:
+    inputs:
+      source:
+        required: true
+        type: string
+      target:
+        required: true
+        type: string
+jobs:
+  sync:
+    permissions:
+      pull-requests: write
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - id: auth
+      name: 'Fetch remote URLs'
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
+        create_credentials_file: true
+        service_account: ${{ secrets.GSA }}
+        token_format: 'access_token'
+    - name: Extract Cloud Run URLs
+      shell: bash
+      run: |-
+        echo "source=$(gcloud run services describe remote-${{ inputs.source }} --region ${{ secrets.GCLOUD_REGION }} --format 'value(status.url)' --project ${{ secrets.GCLOUD_PROJECT }})" >> $GITHUB_OUTPUT
+        echo "target=$(gcloud run services describe remote-${{ inputs.target }} --region ${{ secrets.GCLOUD_REGION }} --format 'value(status.url)' --project ${{ secrets.GCLOUD_PROJECT }})" >> $GITHUB_OUTPUT
+      id: get_cloudrun_urls
+    - id: auth_source
+      name: 'Authenticate to Google Cloud (source)'
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
+        create_credentials_file: true
+        service_account: ${{ secrets.GSA }}
+        token_format: 'id_token'
+        id_token_audience: ${{ steps.get_cloudrun_urls.outputs.source }}
+    - id: auth_target
+      name: 'Authenticate to Google Cloud (target)'
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
+        create_credentials_file: true
+        service_account: ${{ secrets.GSA }}
+        token_format: 'id_token'
+        id_token_audience: ${{ steps.get_cloudrun_urls.outputs.target }}
+    - name: Sync database
+      shell: bash
+      run: |-
+        ARCH="homebrew-cli_Linux_x86_64.tar.gz"
+        curl -s https://api.github.com/repos/LibOps/homebrew-cli/releases/latest > latest.json
+        URL=$(jq -rc '.assets[] | select(.name == "'$ARCH'") | .browser_download_url' latest.json)
+        echo "Fetching latest libops CLI release from $URL"
+        curl -Ls -o ./$ARCH $URL
+        tar -zxvf $ARCH
+        ./libops sync-db \
+          --site ${{ secrets.GCLOUD_PROJECT }} \
+          --source ${{ inputs.source }} \
+          --target ${{ inputs.target }} \
+          --source-token ${{ steps.auth_source.outputs.id_token }} \
+          --target-token ${{ steps.auth_target.outputs.id_token }}

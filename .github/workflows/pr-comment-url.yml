@@ -1,0 +1,35 @@
+name: Workflow Template - add URL to PR
+on:
+  workflow_call:
+jobs:
+  get-url:
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.get_cloudrun_url.outputs.url }}
+    steps:
+      - id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
+          create_credentials_file: true
+          service_account: ${{ secrets.GSA }}
+          token_format: 'access_token'
+      - name: Extract deploy cloud run URL
+        shell: bash
+        run: |-
+          echo "url=$(gcloud run services describe drupal-${GITHUB_HEAD_REF} --region ${{ secrets.GCLOUD_REGION }} --format 'value(status.url)' --project ${{ secrets.GCLOUD_PROJECT }})" >> $GITHUB_OUTPUT
+        id: get_cloudrun_url
+  comment:
+    needs: get-url
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: 'This environment can be accessed at [${{ needs.get-url.outputs.url }}](${{ needs.get-url.outputs.url }})'
+            })

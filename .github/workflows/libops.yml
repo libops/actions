@@ -1,0 +1,75 @@
+name: Workflow Template - libops.yml change
+on:
+  workflow_call:
+    inputs:
+      branch:
+        required: true
+        type: string
+      route:
+        required: false
+        type: string
+        default: "yaml"
+jobs:
+  update-libops-yml:
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - id: 'auth'
+      name: 'Authenticate to Google Cloud'
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
+        create_credentials_file: true
+        service_account: ${{ secrets.GSA }}
+        token_format: 'access_token'
+    - name: Extract deploy cloud run URL
+      shell: bash
+      run: |-
+        echo "url=$(gcloud run services describe deploy-development --region ${{ secrets.GCLOUD_REGION }} --format 'value(status.url)' --project ${{ secrets.GCLOUD_PROJECT }})" >> $GITHUB_OUTPUT
+        echo "remote=$(gcloud run services describe remote-development --region ${{ secrets.GCLOUD_REGION }} --format 'value(status.url)' --project ${{ secrets.GCLOUD_PROJECT }})" >> $GITHUB_OUTPUT
+      id: get_cloudrun_url
+    - id: 'auth_id'
+      name: 'Get deployment token'
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
+        create_credentials_file: true
+        service_account: ${{ secrets.GSA }}
+        token_format: 'id_token'
+        id_token_audience: ${{ steps.get_cloudrun_url.outputs.url }}
+    - id: 'remote_id'
+      name: 'Get remote identity token'
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
+        create_credentials_file: true
+        service_account: ${{ secrets.GSA }}
+        token_format: 'id_token'
+        id_token_audience: ${{ steps.get_cloudrun_url.outputs.remote }}
+    - name: Start environment
+      run: |-
+        ARCH="homebrew-cli_Linux_x86_64.tar.gz"
+        curl -s https://api.github.com/repos/LibOps/homebrew-cli/releases/latest > latest.json
+        URL=$(jq -rc '.assets[] | select(.name == "'$ARCH'") | .browser_download_url' latest.json)
+        curl -Ls -o ./$ARCH $URL
+        tar -zxf $ARCH
+        ./libops --token ${{ steps.remote_id.outputs.id_token }} drush status || exit 0
+    - name: Deploy YAML
+      run: |-
+        set -eou pipefail
+        
+        STATUS=$(curl -w '%{http_code}' \
+          --header "Authorization: Bearer ${{ steps.auth_id.outputs.id_token }}" \
+          -o deploy.resp \
+          -F file=@libops.yml \
+          -F "branch=${{ inputs.branch }}" \
+          ${{ steps.get_cloudrun_url.outputs.url }}/${{ inputs.route }})
+        echo "Deploy returned ${STATUS}"
+        if [ ${STATUS} -gt 299 ]; then
+          echo "Failed to deploy"
+          cat deploy.resp
+          exit 1
+        fi
