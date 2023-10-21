@@ -44,8 +44,8 @@ jobs:
             -w '%{http_code}' \
             -o /dev/null \
             -s \
-            ${{ steps.get_cloudrun_urls.outputs.target }}/ping/)
-          if [ ${STATUS} -eq 200 ]; then
+            ${{ steps.get_cloudrun_urls.outputs.target }}/wakeup)
+          if [ ${STATUS} -eq 204 ]; then
             echo "We're live 🚀"
             exit 0
           fi
