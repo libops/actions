@@ -6,6 +6,13 @@ on:
         required: true
         type: string
 jobs:
+  ping:
+    uses: ./.github/workflows/ping.yml
+    permissions:
+      id-token: write
+    secrets: inherit
+    with:
+      environment: ${{ inputs.environment }}
   build-push:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
@@ -50,7 +57,7 @@ jobs:
           us-docker.pkg.dev/${{ secrets.GCLOUD_PROJECT }}/private/drupal:${{ inputs.environment }}
           us-docker.pkg.dev/${{ secrets.GCLOUD_PROJECT }}/private/drupal:${{ inputs.environment }}-${{steps.extract_tag.outputs.tag}}
   deploy:
-    needs: build-push
+    needs: [ping, build-push]
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     permissions:
