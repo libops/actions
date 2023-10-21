@@ -35,7 +35,6 @@ jobs:
         token_format: 'id_token'
         id_token_audience: ${{ steps.get_cloudrun_urls.outputs.target }}
     - name: Ping environment
-      shell: bash
       run: |-
         set -eou pipefail
 
