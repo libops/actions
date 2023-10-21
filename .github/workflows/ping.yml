@@ -1,0 +1,59 @@
+name: Ping environment
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+jobs:
+  ping:
+    permissions:
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+    - id: auth
+      name: 'Fetch remote URLs'
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
+        create_credentials_file: true
+        service_account: ${{ secrets.GSA }}
+        token_format: 'access_token'
+    - name: Extract Cloud Run URLs
+      shell: bash
+      run: |-
+        echo "target=$(gcloud run services describe remote-${{ inputs.environment }} --region ${{ secrets.GCLOUD_REGION }} --format 'value(status.url)' --project ${{ secrets.GCLOUD_PROJECT }})" >> $GITHUB_OUTPUT
+      id: get_cloudrun_urls
+    - id: auth_target
+      name: 'Authenticate to Google Cloud (source)'
+      uses: 'google-github-actions/auth@v1'
+      with:
+        workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
+        create_credentials_file: true
+        service_account: ${{ secrets.GSA }}
+        token_format: 'id_token'
+        id_token_audience: ${{ steps.get_cloudrun_urls.outputs.target }}
+    - name: Ping environment
+      shell: bash
+      run: |-
+        set -eou pipefail
+
+        COUNTER=0
+        while [ 1 ]; do
+          STATUS=$(curl -H "Authorization: Bearer ${{ steps.auth_target.outputs.id_token }}" \
+            -w '%{http_code}' \
+            -o /dev/null \
+            -s \
+            ${{ steps.get_cloudrun_url.outputs.target }}/ping/)
+          if [ ${STATUS} -eq 200 ]; then
+            echo "We're live 🚀"
+            exit 0
+          fi
+          echo "Ping returned ${STATUS}"
+          ((COUNTER++))
+          if [ $COUNTER -eq 50 ]; then
+            echo "Failed to come online after 4m"
+            exit 1
+          fi
+          sleep 5;
+        done
