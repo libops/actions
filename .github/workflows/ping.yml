@@ -8,15 +8,16 @@ on:
 jobs:
   ping:
     permissions:
+      contents: read
       id-token: write
     runs-on: ubuntu-latest
     steps:
+    - uses: 'actions/checkout@v4'
     - id: auth
       name: 'Fetch remote URLs'
       uses: 'google-github-actions/auth@v1'
       with:
         workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
-        create_credentials_file: false
         service_account: ${{ secrets.GSA }}
         token_format: 'access_token'
     - name: Extract Cloud Run URLs
