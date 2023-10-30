@@ -9,6 +9,9 @@ on:
         required: false
         type: string
         default: "yaml"
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   update-libops-yml:
     permissions:
