@@ -1,0 +1,44 @@
+name: Workflow Template - add developer
+on:
+  workflow_call:
+    inputs:
+      email:
+        description: 'Google Cloud account with developer access to this repository'
+        required: true
+        type: string
+      ip:
+        description: 'IP Address to add to the HTTPS and SSH firewall'
+        required: false
+        type: string
+        default: ""
+jobs:
+  add-developer:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Add developer
+      run: |-
+        ARCH="homebrew-cli_Linux_x86_64.tar.gz"
+        curl -s https://api.github.com/repos/LibOps/homebrew-cli/releases/latest > latest.json
+        URL=$(jq -rc '.assets[] | select(.name == "'$ARCH'") | .browser_download_url' latest.json)
+        curl -Ls -o ./$ARCH $URL
+        tar -zxf $ARCH -C /tmp
+        rm $ARCH latest.json
+        
+        if [ "${{ inputs.ip }}" != "" ]; then
+          /tmp/libops set developer --google-account ${{ inputs.email }} --ip ${{ inputs.ip }}
+        else
+          /tmp/libops set developer --google-account ${{ inputs.email }}
+        fi
+
+        git config --global user.name 'libops-automation'
+        git config --global user.email 'libops-automation@users.noreply.github.com'
+        git add libops.yml
+        git commit -m "Adding ${{ inputs.email }}"
+        git push origin development
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
