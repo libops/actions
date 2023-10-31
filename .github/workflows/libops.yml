@@ -10,7 +10,7 @@ on:
         type: string
         default: "yaml"
 concurrency:
-  group: ${{ github.ref }}
+  group: libops-yml-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   update-libops-yml:
