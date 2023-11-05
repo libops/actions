@@ -51,6 +51,8 @@ jobs:
     - name: Sync database
       shell: bash
       run: |-
+        set -eou pipefail
+
         ARCH="homebrew-cli_Linux_x86_64.tar.gz"
         curl -s https://api.github.com/repos/LibOps/homebrew-cli/releases/latest > latest.json
         URL=$(jq -rc '.assets[] | select(.name == "'$ARCH'") | .browser_download_url' latest.json)
