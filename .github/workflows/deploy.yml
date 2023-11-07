@@ -57,6 +57,8 @@ jobs:
         context: .
         push: true
         build-args: PHP_VERSION=${{steps.php_version.outputs.version}}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
         tags: |
           us-docker.pkg.dev/${{ secrets.GCLOUD_PROJECT }}/private/drupal:${{ inputs.environment }}
           us-docker.pkg.dev/${{ secrets.GCLOUD_PROJECT }}/private/drupal:${{ inputs.environment }}-${{steps.extract_tag.outputs.tag}}
