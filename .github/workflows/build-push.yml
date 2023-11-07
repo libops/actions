@@ -52,6 +52,8 @@ jobs:
         context: ${{ inputs.context }}
         push: true
         build-args: ${{ inputs.build-args }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
         tags: |
           us-docker.pkg.dev/${{ secrets.GCLOUD_PROJECT }}/${{ inputs.image }}:${{steps.extract_branch.outputs.branch}}-${{steps.extract_tag.outputs.tag}}
           us-docker.pkg.dev/${{ secrets.GCLOUD_PROJECT }}/${{ inputs.image }}:${{steps.extract_branch.outputs.branch}}
