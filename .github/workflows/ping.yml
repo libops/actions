@@ -46,7 +46,7 @@ jobs:
             -o /dev/null \
             -s \
             ${{ steps.get_cloudrun_urls.outputs.target }}/wakeup)
-          if [ ${STATUS} -eq 204 ]; then
+          if [ ${STATUS} -gt 199 ] && [ ${STATUS} -lt 300 ]; then
             echo "We're live 🚀"
             exit 0
           fi
