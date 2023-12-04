@@ -59,7 +59,7 @@ jobs:
         URL=$(jq -rc '.assets[] | select(.name == "'$ARCH'") | .browser_download_url' latest.json)
         curl -Ls -o ./$ARCH $URL
         tar -zxf $ARCH
-        ./libops --token ${{ steps.remote_id.outputs.id_token }} drush status || exit 0
+        ./libops --token ${{ steps.remote_id.outputs.id_token }} drush status || exit 1
     - name: Deploy YAML
       run: |-
         set -eou pipefail
