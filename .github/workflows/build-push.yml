@@ -22,9 +22,11 @@ jobs:
       id-token: write
     steps:
     - uses: 'actions/checkout@v4'
-    - name: Extract branch name
+    - name: Extract branch name as docker tag
       shell: bash
-      run: echo "branch=${GITHUB_REF#refs/heads/}"  >> $GITHUB_OUTPUT
+      run: |-
+        BRANCH=$(echo "${GITHUB_REF#refs/heads/}" | sed 's/[^a-zA-Z0-9._-]//g' | awk '{print substr($0, length($0)-120)}')
+        echo "branch=$BRANCH" >> $GITHUB_OUTPUT
       id: extract_branch
     - name: Extract tag name
       shell: bash
