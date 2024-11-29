@@ -18,7 +18,7 @@ jobs:
     with:
       environment: ${{ inputs.environment }}
   build-push:
-    runs-on: ubuntu-22.04
+    runs-on: self-hosted
     timeout-minutes: 5
     permissions:
       contents: read
