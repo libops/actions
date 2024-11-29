@@ -18,7 +18,9 @@ jobs:
     with:
       environment: ${{ inputs.environment }}
   build-push:
-    runs-on: self-hosted
+    runs-on: 
+      - self-hosted
+      - ${{ inputs.environment }}
     timeout-minutes: 5
     permissions:
       contents: read
@@ -62,51 +64,25 @@ jobs:
           us-docker.pkg.dev/${{ secrets.GCLOUD_PROJECT }}/private/drupal:${{ inputs.environment }}-${{steps.extract_tag.outputs.tag}}
   deploy:
     needs: [ping, build-push]
-    runs-on: ubuntu-22.04
+    runs-on: 
+      - self-hosted
+      - ${{ inputs.environment }}
     timeout-minutes: 10
     permissions:
       contents: read
       id-token: write
     steps:
-    - name: Extract tag name
-      shell: bash
-      run: |-
-        t=$(echo ${GITHUB_SHA} | cut -c1-7)
-        echo "tag=$t" >> $GITHUB_OUTPUT
-      id: extract_tag
     - uses: 'actions/checkout@v4'
-    - id: 'auth'
-      name: 'Authenticate to Google Cloud'
-      uses: 'google-github-actions/auth@v2'
-      with:
-        workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
-        create_credentials_file: true
-        service_account: ${{ secrets.GSA }}
-        token_format: 'access_token'
-    - name: Extract deploy cloud run URL
-      shell: bash
-      run: echo "url=$(gcloud run services describe deploy-${{ inputs.environment }} --region ${{ secrets.GCLOUD_REGION }} --format 'value(status.url)' --project ${{ secrets.GCLOUD_PROJECT }})" >> $GITHUB_OUTPUT
-      id: get_cloudrun_url
-    - id: 'auth_id'
-      name: 'Authenticate to Google Cloud'
-      uses: 'google-github-actions/auth@v2'
-      with:
-        workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
-        create_credentials_file: true
-        service_account: ${{ secrets.GSA }}
-        token_format: 'id_token'
-        id_token_audience: ${{ steps.get_cloudrun_url.outputs.url }}
-    # Deploy the Docker image
     - name: Deploy
       run: |-
         set -eou pipefail
 
-        STATUS=$(curl -H "Authorization: Bearer ${{ steps.auth_id.outputs.id_token }}" \
+        STATUS=$(curl -s \
           -X POST \
-          -w '%{http_code}' -o /dev/null \
-          -s \
+          -w '%{http_code}' \
+          -o /dev/null \
           -d "tag=${{ inputs.environment }}-${{steps.extract_tag.outputs.tag}}" \
-          ${{ steps.get_cloudrun_url.outputs.url }}/deploy)
+          http://localhost:8888/deploy)
         echo "Deploy returned ${STATUS}"
         if [ ${STATUS} -gt 299 ]; then
           echo "Failed to deploy"
