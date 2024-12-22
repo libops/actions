@@ -17,7 +17,7 @@ jobs:
     secrets: inherit
     with:
       environment: ${{ inputs.environment }}
-  build-push:
+  build-deploy:
     runs-on: 
       - self-hosted
       - ${{ inputs.environment }}
@@ -26,65 +26,59 @@ jobs:
       contents: read
       id-token: write
     steps:
-    - name: Extract tag name
+
+    - name: Ensure environment is a docker tag
       shell: bash
-      run: |-
-        t=$(echo ${GITHUB_SHA} | cut -c1-7)
-        echo "tag=$t" >> $GITHUB_OUTPUT
-      id: extract_tag
+      run: |
+        if [[ ! "${{ inputs.environment }}" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+          echo "ERROR: Invalid environment value. Must match ^[a-zA-Z0-9._-]+$"
+          exit 1
+        fi
+
     - uses: 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' # v4
-    - name: Get php version
+
+    - name: auth helper
+      run: /usr/bin/docker-credential-gcr configure-docker --registries us-docker.pkg.dev
+
+    - name: Get isle buildkit version
       shell: bash
       run: |-
-        PHP_VERSION=$(yq .php libops.yml)
-        echo "version=$PHP_VERSION" >> $GITHUB_OUTPUT
-      id: php_version
-    - id: 'auth'
-      name: 'Authenticate to Google Cloud'
-      uses: 'google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f' # v2
-      with:
-        workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
-        create_credentials_file: true
-        service_account: ${{ secrets.GSA }}
-        token_format: 'access_token'
-    - uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
-      name: 'Docker login'
-      with:
-        registry: 'us-docker.pkg.dev'
-        username: 'oauth2accesstoken'
-        password: '${{ steps.auth.outputs.access_token }}'
-    - name: Build and push Drupal
+        ISLANDORA_TAG=$(yq '."islandora-tag"' libops.yml)
+        echo "tag=$ISLANDORA_TAG" >> $GITHUB_OUTPUT
+      id: buildkit_tag
+
+    - name: Build drupal
       uses: docker/build-push-action@48aba3b46d1b1fec4febb7c5d0c644b249a11355 # v6
       with:
         context: .
-        push: true
-        build-args: PHP_VERSION=${{steps.php_version.outputs.version}}
+        build-args: ISLANDORA_TAG=${{steps.buildkit_tag.outputs.tag}}
         tags: |
           us-docker.pkg.dev/${{ secrets.GCLOUD_PROJECT }}/private/drupal:${{ inputs.environment }}
-          us-docker.pkg.dev/${{ secrets.GCLOUD_PROJECT }}/private/drupal:${{ inputs.environment }}-${{steps.extract_tag.outputs.tag}}
-  deploy:
-    needs: [ping, build-push]
-    runs-on: 
-      - self-hosted
-      - ${{ inputs.environment }}
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-    - uses: 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' # v4
-    - name: Deploy
+
+    - name: build-deploy
+      shell: bash
+      working-directory: /mnt/disks/data/compose
+      env:
+        ISLANDORA_TAG: ${{steps.buildkit_tag.outputs.tag}}
       run: |-
         set -eou pipefail
 
-        STATUS=$(curl -s \
-          -X POST \
-          -w '%{http_code}' \
-          -o /dev/null \
-          -d "tag=${{ inputs.environment }}-${{steps.extract_tag.outputs.tag}}" \
-          http://localhost:8888/deploy)
-        echo "Deploy returned ${STATUS}"
-        if [ ${STATUS} -gt 299 ]; then
-          echo "Failed to deploy"
-          exit 1
-        fi
+        echo "Putting site in maintenance mode"
+        docker exec libops-isle-drupal-1 drush state:set system.maintenance_mode 1 --input-format=integer
+
+        echo "Clearing cache"
+        docker exec libops-isle-drupal-1 drush cr
+
+        echo "Restarting drupal"
+        docker compose --env-file .env --env-file /home/runner/libops.env up drupal -d --wait || echo "continuing"
+
+        echo "Updating db"
+        docker exec libops-isle-drupal-1 drush updb -y
+
+        echo "Out of maintenance mode"
+        docker exec libops-isle-drupal-1 drush state:set system.maintenance_mode 0 --input-format=integer
+
+        echo "Clearing cache"
+        docker exec libops-isle-drupal-1 drush cr
+
+        echo "deployed successfully 🎉"
