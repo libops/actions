@@ -36,6 +36,8 @@ jobs:
         fi
 
     - uses: 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' # v4
+      with:
+        path: /mnt/disks/data/app
 
     - name: auth helper
       run: /usr/bin/docker-credential-gcr configure-docker --registries us-docker.pkg.dev
@@ -48,14 +50,13 @@ jobs:
       id: buildkit_tag
 
     - name: Build drupal
-      uses: docker/build-push-action@48aba3b46d1b1fec4febb7c5d0c644b249a11355 # v6
-      with:
-        context: .
-        build-args: ISLANDORA_TAG=${{steps.buildkit_tag.outputs.tag}}
-        tags: |
-          us-docker.pkg.dev/${{ secrets.GCLOUD_PROJECT }}/private/drupal:${{ inputs.environment }}
+      working-directory: /mnt/disks/data/compose
+      env:
+        ISLANDORA_TAG: ${{steps.buildkit_tag.outputs.tag}}
+      shell: bash
+      run: docker compose build
 
-    - name: build-deploy
+    - name: deploy
       shell: bash
       working-directory: /mnt/disks/data/compose
       env:
