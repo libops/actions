@@ -37,7 +37,7 @@ jobs:
 
     - uses: 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' # v4
 
-    - name: auth helper
+    - name: docker auth helper
       run: /usr/bin/docker-credential-gcr configure-docker --registries us-docker.pkg.dev
 
     - name: Get isle buildkit version
@@ -47,12 +47,12 @@ jobs:
         echo "tag=$ISLANDORA_TAG" >> $GITHUB_OUTPUT
       id: buildkit_tag
 
-    - name: Build drupal
+    - name: build
       working-directory: /mnt/disks/data/compose
       env:
         ISLANDORA_TAG: ${{steps.buildkit_tag.outputs.tag}}
       shell: bash
-      run: docker compose build
+      run: docker compose --env-file .env --env-file /home/runner/libops.env build --pull
 
     - name: deploy
       shell: bash
