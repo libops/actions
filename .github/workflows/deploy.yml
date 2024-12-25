@@ -63,16 +63,8 @@ jobs:
 
         echo "Overwriting docker volume"
         time sudo rsync -qrltD \
-          --delete \
           --chmod=D750,F640 \
           --chown=100:101 \
-          --exclude='vendor/' \
-          --exclude='web/core/' \
-          --exclude='web/modules/contrib/' \
-          --exclude='web/themes/contrib/' \
-          --exclude='web/libraries/' \
-          --exclude='private/' \
-          --exclude='web/sites/default/files/' \
           "${GITHUB_WORKSPACE}/" /var/lib/docker/volumes/libops-isle_drupal-root/_data/
 
         docker exec libops-isle-drupal-1 composer install
