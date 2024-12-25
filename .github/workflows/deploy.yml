@@ -82,3 +82,9 @@ jobs:
         docker exec libops-isle-drupal-1 drush cr
 
         echo "deployed successfully 🎉"
+    - name: cleanup
+      shell: bash
+      run: |-
+        if [ -f "$HOME/.docker/config.json" ]; then
+          rm "$HOME/.docker/config.json"
+        fi
