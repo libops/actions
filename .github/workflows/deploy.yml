@@ -17,7 +17,7 @@ jobs:
     secrets: inherit
     with:
       environment: ${{ inputs.environment }}
-  build-deploy:
+  deploy:
     runs-on: 
       - self-hosted
       - ${{ inputs.environment }}
@@ -55,33 +55,37 @@ jobs:
       run: |-
         set -eou pipefail
 
-        echo "Putting site in maintenance mode"
+        echo_time() {
+            echo "[$(date +"%H:%M:%S")] $*"
+        }
+
+        echo_time "Putting site in maintenance mode"
         docker exec libops-isle-drupal-1 drush state:set system.maintenance_mode 1 --input-format=integer
 
-        echo "Clearing cache"
+        echo_time "Clearing cache"
         docker exec libops-isle-drupal-1 drush cr
 
-        echo "Overwriting docker volume"
-        time sudo rsync -qrltD \
+        echo_time "Overwriting docker volume"
+        sudo rsync -qrltD \
           --chmod=D750,F640 \
           --chown=100:101 \
           "${GITHUB_WORKSPACE}/" /var/lib/docker/volumes/libops-isle_drupal-root/_data/
 
-        docker exec libops-isle-drupal-1 composer install
+        echo_time exec libops-isle-drupal-1 composer install
 
-        echo "Restarting drupal"
+        echo_time "Restarting drupal"
         docker compose --env-file .env --env-file /home/runner/libops.env up -d --wait --remove-orphans || echo "continuing"
 
-        echo "Updating db"
+        echo_time "Updating db"
         docker exec libops-isle-drupal-1 drush updb -y
 
-        echo "Out of maintenance mode"
+        echo_time "Out of maintenance mode"
         docker exec libops-isle-drupal-1 drush state:set system.maintenance_mode 0 --input-format=integer
 
-        echo "Clearing cache"
+        echo_time "Clearing cache"
         docker exec libops-isle-drupal-1 drush cr
 
-        echo "deployed successfully 🎉"
+        echo_time "deployed successfully 🎉"
     - name: cleanup
       shell: bash
       run: |-
