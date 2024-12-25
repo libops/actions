@@ -41,24 +41,11 @@ jobs:
       shell: bash
       id: vars
       run: |-
-        SHA=$(echo ${GITHUB_SHA} | cut -c1-7)
-        echo "sha=$SHA" >> $GITHUB_OUTPUT
-
         ISLANDORA_TAG=$(yq '."islandora-tag"' libops.yml)
         echo "tag=$ISLANDORA_TAG" >> $GITHUB_OUTPUT
 
     - name: auth helper
       run: /usr/bin/docker-credential-gcr configure-docker --registries us-docker.pkg.dev
-
-    - name: build
-      uses: docker/build-push-action@48aba3b46d1b1fec4febb7c5d0c644b249a11355 # v6
-      with:
-        context: .
-        build-args: |
-          BASE_IMAGE=us-docker.pkg.dev/${{ secrets.GCLOUD_PROJECT }}/private/drupal
-          ISLANDORA_TAG=${{ inputs.environment }}
-        tags: |
-          us-docker.pkg.dev/${{ secrets.GCLOUD_PROJECT }}/private/drupal:${{ inputs.environment }}
 
     - name: deploy
       shell: bash
