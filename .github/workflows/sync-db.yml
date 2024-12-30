@@ -53,13 +53,13 @@ jobs:
       run: |-
         set -eou pipefail
 
-        ARCH="homebrew-cli_Linux_x86_64.tar.gz"
-        curl -s https://api.github.com/repos/LibOps/homebrew-cli/releases/latest > latest.json
+        ARCH="sitectl_Linux_x86_64.tar.gz"
+        curl -s https://api.github.com/repos/LibOps/sitectl/releases/latest > latest.json
         URL=$(jq -rc '.assets[] | select(.name == "'$ARCH'") | .browser_download_url' latest.json)
         echo "Fetching latest libops CLI release from $URL"
         curl -Ls -o ./$ARCH $URL
         tar -zxvf $ARCH
-        ./libops sync-db \
+        ./sitectl sync-db \
           --site ${{ secrets.GCLOUD_PROJECT }} \
           --source ${{ inputs.source }} \
           --target ${{ inputs.target }} \

@@ -38,12 +38,12 @@ jobs:
     - name: Sync database
       shell: bash
       run: |-
-        ARCH="homebrew-cli_Linux_x86_64.tar.gz"
-        curl -s https://api.github.com/repos/LibOps/homebrew-cli/releases/latest > latest.json
+        ARCH="sitectl_Linux_x86_64.tar.gz"
+        curl -s https://api.github.com/repos/LibOps/sitectl/releases/latest > latest.json
         URL=$(jq -rc '.assets[] | select(.name == "'$ARCH'") | .browser_download_url' latest.json)
         wget $URL
         tar -zxf $ARCH
-        ./libops backup \
+        ./sitectl backup \
           --site ${{ secrets.GCLOUD_PROJECT }} \
           --environment ${{ inputs.environment }} \
           --token ${{ steps.auth_environment.outputs.id_token }}
