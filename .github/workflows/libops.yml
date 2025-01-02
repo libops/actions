@@ -5,10 +5,10 @@ on:
       branch:
         required: true
         type: string
-      route:
-        required: false
+      action:
+        required: true
         type: string
-        default: "yaml"
+        default: "set"
 concurrency:
   group: libops-yml-${{ github.ref }}
   cancel-in-progress: true
@@ -17,9 +17,24 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    runs-on: ubuntu-24.04
+    runs-on: 
+      - self-hosted
+      - development
     steps:
+    - name: Ensure inputs as valid
+      shell: bash
+      run: |
+        if [[ ! "${{ inputs.branch }}" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+          echo "ERROR: Invalid branch value. Must match ^[a-zA-Z0-9._-]+$"
+          exit 1
+        fi
+        if [[ ! "${{ inputs.action }}" =~ ^(set|del)$ ]]; then
+          echo "ERROR: Invalid action. Must be set or del"
+          exit 1
+        fi
+
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
     - id: 'auth'
       name: 'Authenticate to Google Cloud'
       uses: 'google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f' # v2
@@ -28,51 +43,16 @@ jobs:
         create_credentials_file: true
         service_account: ${{ secrets.GSA }}
         token_format: 'access_token'
-    - name: Extract deploy cloud run URL
-      shell: bash
-      run: |-
-        echo "url=$(gcloud run services describe deploy-development --region ${{ secrets.GCLOUD_REGION }} --format 'value(status.url)' --project ${{ secrets.GCLOUD_PROJECT }})" >> $GITHUB_OUTPUT
-        echo "remote=$(gcloud run services describe remote-development --region ${{ secrets.GCLOUD_REGION }} --format 'value(status.url)' --project ${{ secrets.GCLOUD_PROJECT }})" >> $GITHUB_OUTPUT
-      id: get_cloudrun_url
-    - id: 'auth_id'
-      name: 'Get deployment token'
-      uses: 'google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f' # v2
-      with:
-        workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
-        create_credentials_file: true
-        service_account: ${{ secrets.GSA }}
-        token_format: 'id_token'
-        id_token_audience: ${{ steps.get_cloudrun_url.outputs.url }}
-    - id: 'remote_id'
-      name: 'Get remote identity token'
-      uses: 'google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f' # v2
-      with:
-        workload_identity_provider: ${{ secrets.GCLOUD_OIDC_POOL }}
-        create_credentials_file: true
-        service_account: ${{ secrets.GSA }}
-        token_format: 'id_token'
-        id_token_audience: ${{ steps.get_cloudrun_url.outputs.remote }}
-    - name: Start environment
-      run: |-
-        ARCH="sitectl_Linux_x86_64.tar.gz"
-        curl -s https://api.github.com/repos/LibOps/sitectl/releases/latest > latest.json
-        URL=$(jq -rc '.assets[] | select(.name == "'$ARCH'") | .browser_download_url' latest.json)
-        curl -Ls -o ./$ARCH $URL
-        tar -zxf $ARCH
-        ./sitectl --token ${{ steps.remote_id.outputs.id_token }} drush status || exit 1
+
     - name: Deploy YAML
       run: |-
         set -eou pipefail
-        
-        STATUS=$(curl -w '%{http_code}' \
-          --header "Authorization: Bearer ${{ steps.auth_id.outputs.id_token }}" \
-          -o deploy.resp \
-          -F file=@libops.yml \
-          -F "branch=${{ inputs.branch }}" \
-          ${{ steps.get_cloudrun_url.outputs.url }}/${{ inputs.route }})
-        echo "Deploy returned ${STATUS}"
-        if [ ${STATUS} -gt 299 ]; then
-          echo "Failed to deploy"
-          cat deploy.resp
-          exit 1
-        fi
+
+        CRED_FILE=$(echo "${{ steps.auth.outputs.credentials_file_path }}" | xargs basename)
+        docker run --rm \
+          --pull=always \
+          -v $(pwd):/code \
+          --env TF_VAR_libops_yaml=/code/libops.yml \
+          --env GOOGLE_APPLICATION_CREDENTIALS=/code/$CRED_FILE \
+          --env GOOGLE_PROJECT_ID="${{ secrets.GCLOUD_PROJECT }}" \
+          us-docker.pkg.dev/libops-images/shared/deploy:main "${{ inputs.action }}" "${{ inputs.branch }}" 
