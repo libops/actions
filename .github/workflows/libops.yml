@@ -45,14 +45,4 @@ jobs:
         token_format: 'access_token'
 
     - name: Deploy YAML
-      run: |-
-        set -eou pipefail
-
-        CRED_FILE=$(echo "${{ steps.auth.outputs.credentials_file_path }}" | xargs basename)
-        docker run --rm \
-          --pull=always \
-          -v $(pwd):/code \
-          --env TF_VAR_libops_yaml=/code/libops.yml \
-          --env GOOGLE_APPLICATION_CREDENTIALS=/code/$CRED_FILE \
-          --env GOOGLE_PROJECT_ID="${{ secrets.GCLOUD_PROJECT }}" \
-          us-docker.pkg.dev/libops-images/shared/deploy:main "${{ inputs.action }}" "${{ inputs.branch }}" 
+      run: /libops/scripts/tf-apply-isle.sh "${{ secrets.GCLOUD_PROJECT }}" "${{ steps.auth.outputs.credentials_file_path }}" "${{ inputs.action }}" "${{ inputs.branch }}"
