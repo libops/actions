@@ -24,7 +24,7 @@ jobs:
     - name: Add developer
       run: |-
         ARCH="sitectl_Linux_x86_64.tar.gz"
-        curl -s https://api.github.com/repos/LibOps/sitectl/releases/latest > latest.json
+        curl -s https://api.github.com/repos/libops/sitectl/releases/latest > latest.json
         URL=$(jq -rc '.assets[] | select(.name == "'$ARCH'") | .browser_download_url' latest.json)
         curl -Ls -o ./$ARCH $URL
         tar -zxf $ARCH -C /tmp

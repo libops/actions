@@ -1,3 +1,3 @@
-# LibOps Actions
+# libops Actions
 
-GitHub Actions used across the LibOps org.
+GitHub Actions used across the libops org.
