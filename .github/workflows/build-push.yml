@@ -13,6 +13,10 @@ on:
         required: false
         type: string
         default: "."
+      tag:
+        required: false
+        type: string
+        default: ""
 jobs:
   build-push-ar:
     runs-on: ubuntu-24.04
@@ -22,18 +26,17 @@ jobs:
       id-token: write
     steps:
     - uses: 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' # v4
+
     - name: Extract branch name as docker tag
       shell: bash
       run: |-
         BRANCH=$(echo "${GITHUB_REF#refs/heads/}" | sed 's/[^a-zA-Z0-9._-]//g' | awk '{print substr($0, length($0)-120)}')
+        if [ "$BRANCH" = "main" ] && [ "${{ inputs.build-args }}" != "" ]; then
+          BRANCH="${{ inputs.build-args }}"
+        fi
         echo "branch=$BRANCH" >> $GITHUB_OUTPUT
       id: extract_branch
-    - name: Extract tag name
-      shell: bash
-      run: |-
-        t=$(echo ${GITHUB_SHA} | cut -c1-7)
-        echo "tag=$t" >> $GITHUB_OUTPUT
-      id: extract_tag
+
     - id: 'auth'
       name: 'Authenticate to Google Cloud'
       uses: 'google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f' # v2
@@ -42,12 +45,14 @@ jobs:
         create_credentials_file: true
         service_account: ${{ secrets.GSA }}
         token_format: 'access_token'
+
     - uses: 'docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567' # v3
       name: 'Docker login'
       with:
         registry: 'us-docker.pkg.dev'
         username: 'oauth2accesstoken'
         password: '${{ steps.auth.outputs.access_token }}'
+
     - name: Build and push
       uses: docker/build-push-action@48aba3b46d1b1fec4febb7c5d0c644b249a11355 # v6
       with:
@@ -55,5 +60,4 @@ jobs:
         push: true
         build-args: ${{ inputs.build-args }}
         tags: |
-          us-docker.pkg.dev/${{ secrets.GCLOUD_PROJECT }}/${{ inputs.image }}:${{steps.extract_branch.outputs.branch}}-${{steps.extract_tag.outputs.tag}}
           us-docker.pkg.dev/${{ secrets.GCLOUD_PROJECT }}/${{ inputs.image }}:${{steps.extract_branch.outputs.branch}}
