@@ -33,7 +33,7 @@ jobs:
       shell: bash
       id: vars
       run: |-
-        ISLANDORA_TAG=$(yq '."islandora-tag"' libops.yml)
+        ISLANDORA_TAG=$(yq -r '."islandora-tag"' libops.yml)
         echo "tag=$ISLANDORA_TAG" >> $GITHUB_OUTPUT
 
     - id: 'auth'
