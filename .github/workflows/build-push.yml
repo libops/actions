@@ -72,7 +72,7 @@ jobs:
           GCLOUD_PROJECT: ${{ secrets.GCLOUD_PROJECT }}
           DOCKER_IMAGE: GHCR
           TAG: ${{ inputs.tag }}
-          DOCKER_CONTEXT: ${{ inputs.context }}
+          DOCKER_PASSED_CONTEXT: ${{ inputs.context }}
 
       - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
 
@@ -132,7 +132,7 @@ jobs:
           GCLOUD_PROJECT: ${{ secrets.GCLOUD_PROJECT }}
           DOCKER_IMAGE: ${{ inputs.image }}
           TAG: ${{ inputs.tag }}
-          DOCKER_CONTEXT: ${{ inputs.context }}
+          DOCKER_PASSED_CONTEXT: ${{ inputs.context }}
 
       - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
 
@@ -161,5 +161,5 @@ jobs:
         env:
           DOCKER_IMAGE: ${{ steps.vars.outputs.image }}
           TAG: ${{ steps.vars.outputs.tag }}
-          DOCKER_CONTEXT: ${{ inputs.context }}
+          DOCKER_PASSED_CONTEXT: ${{ inputs.context }}
           GCLOUD_PROJECT: ${{ secrets.GCLOUD_PROJECT }}

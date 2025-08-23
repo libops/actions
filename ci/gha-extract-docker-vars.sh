@@ -15,8 +15,8 @@ if [ "$RUNNER_ARCH" = "ARM64" ]; then
 fi
 
 DOCKER_IMAGE_CACHE="ghcr.io/${GITHUB_REPOSITORY}"
-if [ "${DOCKER_CONTEXT}" != "." ]; then
-  DOCKER_IMAGE_CACHE="${DOCKER_IMAGE_CACHE}/${DOCKER_CONTEXT//[^A-Za-z-]/}"
+if [ "${DOCKER_PASSED_CONTEXT}" != "." ]; then
+  DOCKER_IMAGE_CACHE="${DOCKER_IMAGE_CACHE}/${DOCKER_PASSED_CONTEXT//[^A-Za-z-]/}"
 fi
 
 if [ "${DOCKER_IMAGE}" = "GHCR" ]; then
